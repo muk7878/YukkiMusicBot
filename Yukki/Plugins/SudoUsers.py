@@ -484,7 +484,7 @@ async def broadcast_message_pin_loud(_, message):
         return
     if len(message.command) < 2:
         await message.reply_text(
-            "**Usage**:\n/broadcast [MESSAGE] or [Reply to a Message]"
+            "**Usage**:\n/mbroadcast [MESSAGE] or [Reply to a Message]"
         )
         return
     text = message.text.split(None, 1)[1]
@@ -511,7 +511,7 @@ async def broadcast_message_pin_loud(_, message):
     )
 
 
-@app.on_message(filters.command("broadcast") & filters.user(SUDOERS))
+@app.on_message(filters.command("mbroadcast") & filters.user(SUDOERS))
 async def broadcast(_, message):
     if not message.reply_to_message:
         pass
@@ -534,7 +534,7 @@ async def broadcast(_, message):
         return
     if len(message.command) < 2:
         await message.reply_text(
-            "**Usage**:\n/broadcast [MESSAGE] or [Reply to a Message]"
+            "**Usage**:\n/mbroadcast [MESSAGE] or [Reply to a Message]"
         )
         return
     text = message.text.split(None, 1)[1]
