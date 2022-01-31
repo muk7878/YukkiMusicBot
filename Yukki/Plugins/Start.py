@@ -35,7 +35,7 @@ __HELP__ = """
 - Start the Bot.
 
 
-/help 
+/bantu
 - Get Commands Helper Menu.
 
 
