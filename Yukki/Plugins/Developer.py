@@ -24,7 +24,7 @@ __HELP__ = """
 Only for Sudo Users.
 
 
-/broadcast [Message or Reply to a Message]
+/mbroadcast [Message or Reply to a Message]
 - Broadcast any message to Bot's Served Chats.
 
 
