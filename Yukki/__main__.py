@@ -289,7 +289,7 @@ async def start_command(_, message):
                     LOG_GROUP_ID,
                     f"{message.from_user.mention} has just started bot to check <code>SUDOLIST</code>\n\n**USER ID:** {sender_id}\n**USER NAME:** {sender_name}",
                 )
-        if name == "help":
+        if name == "mhelp":
             text, keyboard = await help_parser(message.from_user.mention)
             await message.delete()
             return await app.send_text(
