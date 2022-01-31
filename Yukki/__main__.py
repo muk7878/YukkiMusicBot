@@ -385,7 +385,7 @@ All commands can be used with: /
     )
 
 
-@app.on_callback_query(filters.regex(hyper"))
+@app.on_callback_query(filters.regex("hyper"))
 async def shikhar(_, CallbackQuery):
     text, keyboard = await help_parser(CallbackQuery.from_user.mention)
     await CallbackQuery.message.edit(text, reply_markup=keyboard)
