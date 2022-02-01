@@ -11,8 +11,8 @@ from Yukki import ASSISTANT_PREFIX, SUDOERS, app, random_assistant
 from Yukki.Database import get_assistant, save_assistant
 from Yukki.Utilities.assistant import get_assistant_details
 
-__mMODULE__ = "Assistant"
-__mHELP__ = f"""
+__MODULE__ = "Assistant"
+__HELP__ = f"""
 
 
 /checkassistant
