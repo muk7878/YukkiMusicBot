@@ -238,7 +238,7 @@ All commands can be used with: / """
 
 @app.on_message(filters.command("mhelp") & filters.private)
 async def help_command(_, message):
-    text, keyboard = await help_parser(message.from_user.mention)
+    text, keyboard = await mhelp_parser(message.from_user.mention)
     await app.send_message(message.chat.id, text, reply_markup=keyboard)
 
 
@@ -289,7 +289,7 @@ async def start_command(_, message):
                     LOG_GROUP_ID,
                     f"{message.from_user.mention} has just started bot to check <code>SUDOLIST</code>\n\n**USER ID:** {sender_id}\n**USER NAME:** {sender_name}",
                 )
-        if name == "help":
+        if name == "mhelp":
             text, keyboard = await help_parser(message.from_user.mention)
             await message.delete()
             return await app.send_text(
@@ -369,7 +369,7 @@ async def start_command(_, message):
     return
 
 
-async def help_parser(name, keyboard=None):
+async def mhelp_parser(name, keyboard=None):
     if not keyboard:
         keyboard = InlineKeyboardMarkup(paginate_modules(0, HELPABLE, "help"))
     return (
@@ -393,12 +393,12 @@ async def shikhar(_, CallbackQuery):
 
 @app.on_callback_query(filters.regex(r"mhelp_(.*?)"))
 async def help_button(client, query):
-    home_match = re.match(r"help_home\((.+?)\)", query.data)
-    mod_match = re.match(r"help_module\((.+?)\)", query.data)
-    prev_match = re.match(r"help_prev\((.+?)\)", query.data)
-    next_match = re.match(r"help_next\((.+?)\)", query.data)
-    back_match = re.match(r"help_back", query.data)
-    create_match = re.match(r"help_create", query.data)
+    home_match = re.match(r"mhelp_home\((.+?)\)", query.data)
+    mod_match = re.match(r"mhelp_module\((.+?)\)", query.data)
+    prev_match = re.match(r"mhelp_prev\((.+?)\)", query.data)
+    next_match = re.match(r"mhelp_next\((.+?)\)", query.data)
+    back_match = re.match(r"mhelp_back", query.data)
+    create_match = re.match(r"mhelp_create", query.data)
     top_text = f"""Hello {query.from_user.first_name},
 
 Click on the buttons for more information.
@@ -469,7 +469,7 @@ All commands can be used with: /
         )
 
     elif create_match:
-        text, keyboard = await help_parser(query)
+        text, keyboard = await mhelp_parser(query)
         await query.message.edit(
             text=text,
             reply_markup=keyboard,
