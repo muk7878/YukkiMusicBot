@@ -13,7 +13,7 @@ from Yukki.Core.PyTgCalls.Converter import convert
 from Yukki.Core.PyTgCalls.Downloader import download
 from Yukki.Decorators.assistant import AssistantAdd
 from Yukki.Decorators.checker import checker
-from venz.Decorators.logger import logging
+from Yukki.Decorators.logger import logging
 from Yukki.Decorators.permission import PermissionCheck
 from Yukki.Database import get_video_limit, get_active_video_chats, is_active_video_chat
 from Yukki.Inline import (playlist_markup, search_markup, search_markup2, livestream_markup,
