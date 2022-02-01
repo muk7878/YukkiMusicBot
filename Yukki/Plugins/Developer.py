@@ -18,8 +18,8 @@ from Yukki.Utilities.tasks import add_task, rm_task
 
 # Eval and Sh module from WBB
 
-__MODULE__ = "Broadcast"
-__HELP__ = """
+__mMODULE__ = "Broadcast"
+__mHELP__ = """
 **Note:**
 Only for Sudo Users.
 
