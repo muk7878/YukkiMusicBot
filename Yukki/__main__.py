@@ -289,7 +289,7 @@ async def start_command(_, message):
                     LOG_GROUP_ID,
                     f"{message.from_user.mention} has just started bot to check <code>SUDOLIST</code>\n\n**USER ID:** {sender_id}\n**USER NAME:** {sender_name}",
                 )
-        if name == "mhelp":
+        if name == "help":
             text, keyboard = await help_parser(message.from_user.mention)
             await message.delete()
             return await app.send_text(
@@ -369,7 +369,7 @@ async def start_command(_, message):
     return
 
 
-async def mhelp_parser(name, keyboard=None):
+async def help_parser(name, keyboard=None):
     if not keyboard:
         keyboard = InlineKeyboardMarkup(paginate_modules(0, HELPABLE, "help"))
     return (
