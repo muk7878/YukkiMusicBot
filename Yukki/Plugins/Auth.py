@@ -9,8 +9,8 @@ from Yukki.Decorators.admins import AdminActual
 from Yukki.Utilities.changers import (alpha_to_int, int_to_alpha,
                                       time_to_seconds)
 
-__MODULE__ = "Auth Users"
-__HELP__ = """
+__mMODULE__ = "Auth Users"
+__mHELP__ = """
 
 **Note:**
 -Auth users can skip, pause, stop, resume Voice Chats even without Admin Rights.
