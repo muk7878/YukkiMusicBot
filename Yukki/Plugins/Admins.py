@@ -32,8 +32,8 @@ from Yukki.Utilities.youtube import get_m3u8, get_yt_info_id
 loop = asyncio.get_event_loop()
 
 
-__MODULE__ = "Voice Chat"
-__HELP__ = """
+__mMODULE__ = "Voice Chat"
+__mHELP__ = """
 
 
 /pause
