@@ -26,11 +26,11 @@ def url_markup(videoid, duration, user_id, query, query_type):
         ],
         [
             InlineKeyboardButton(
-                text="🔎 Pencarian lain",
+                text="🔎 Lagu lainnya",
                 callback_data=f"Search {query}|{user_id}",
             ),
             InlineKeyboardButton(
-                text="🗑 Tutup pencarian",
+                text="🗿 Tutup ",
                 callback_data=f"forceclose {query}|{user_id}",
             ),
         ],
@@ -99,7 +99,7 @@ def search_markup(
                 text="<", callback_data=f"popat 1|{query}|{user_id}"
             ),
             InlineKeyboardButton(
-                text="🗑 Close", callback_data=f"forceclose {query}|{user_id}"
+                text="🗿 Tutup", callback_data=f"forceclose {query}|{user_id}"
             ),
             InlineKeyboardButton(
                 text=">", callback_data=f"popat 1|{query}|{user_id}"
@@ -153,7 +153,7 @@ def search_markup2(
                 text="<", callback_data=f"popat 2|{query}|{user_id}"
             ),
             InlineKeyboardButton(
-                text="🗑 Tutup", callback_data=f"forceclose {query}|{user_id}"
+                text="🗿 Tutup", callback_data=f"forceclose {query}|{user_id}"
             ),
             InlineKeyboardButton(
                 text=">", callback_data=f"popat 2|{query}|{user_id}"
@@ -175,7 +175,7 @@ def secondary_markup(videoid, user_id):
             InlineKeyboardButton(
                 text="🔗 Menu Lain", callback_data=f"other {videoid}|{user_id}"
             ),
-            InlineKeyboardButton(text="🗑 Tutup", callback_data=f"close"),
+            InlineKeyboardButton(text="🌐 Tutup", callback_data=f"close"),
         ],
     ]
     return buttons
