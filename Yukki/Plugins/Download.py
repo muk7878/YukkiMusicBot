@@ -18,8 +18,8 @@ from Yukki.Utilities.download import get_formats, get_type
 user_time = {}
 flex = {}
 
-__MODULE__ = "Global Ban"
-__HELP__ = """
+__mMODULE__ = "Global Ban"
+__mHELP__ = """
 
 **Note:**
 Only for Sudo Users.
