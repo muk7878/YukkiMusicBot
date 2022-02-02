@@ -9,8 +9,8 @@ from pyrogram.types import Message
 from Yukki import BOT_USERNAME, MUSIC_BOT_NAME, app, boottime
 from Yukki.Utilities.ping import get_readable_time
 
-__mMODULE__ = "Ping"
-__mHELP__ = """
+__MODULE__ = "Ping"
+__HELP__ = """
 
 /ping - Check if Bot is alive or not.
 """
