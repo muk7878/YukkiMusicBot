@@ -369,7 +369,7 @@ async def start_command(_, message):
     return
 
 
-async def mhelp_parser(name, keyboard=None):
+async def help_parser(name, keyboard=None):
     if not keyboard:
         keyboard = InlineKeyboardMarkup(paginate_modules(0, HELPABLE, "mhelp"))
     return (
@@ -469,7 +469,7 @@ All commands can be used with: /
         )
 
     elif create_match:
-        text, keyboard = await mhelp_parser(query)
+        text, keyboard = await help_parser(query)
         await query.message.edit(
             text=text,
             reply_markup=keyboard,
