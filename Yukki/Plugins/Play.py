@@ -381,7 +381,7 @@ async def slider_query_results(_, CallbackQuery):
         )
         med = InputMediaPhoto(
             media=thumb,
-            caption=f"📎Judul: **{title}\n\n⏳ Durasi:** {duration_min} Mins\n\n__[Dapatkan Informasi Tambahan Tentang Video](https://t.me/{BOT_USERNAME}?mstart=info_{videoid})__",
+            caption=f"📎Judul: **{title}\n\n⏳ Durasi:** {duration_min} Mins\n\nTekan salah satu Tombol untuk memulai\n\n__[Dapatkan Informasi Tambahan Tentang Video](https://t.me/{BOT_USERNAME}?mstart=info_{videoid})__",
         )
         return await CallbackQuery.edit_message_media(
             media=med, reply_markup=InlineKeyboardMarkup(buttons)
