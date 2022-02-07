@@ -145,7 +145,7 @@ async def play(_, message: Message):
         buttons = url_markup2(videoid, duration_min, message.from_user.id)
         return await message.reply_photo(
             photo=thumb,
-            caption=f"📎Judul: **{title}\n\n⏳Durasi:** {duration_min} Mins\n\n__[Dapatkan Informasi Tambahan Tentang Video](https://t.me/{BOT_USERNAME}?mstart=info_{videoid})__",
+            caption=f"📎Judul: **{title}\n\n⏳Durasi:** {duration_min} Mins\n\nTekan Salah satu Tombol 🎵/🎥 untuk memutar Lagu\n\n__[Dapatkan Informasi Tambahan Tentang Video](https://t.me/{BOT_USERNAME}?mstart=info_{videoid})__",
             reply_markup=InlineKeyboardMarkup(buttons),
         )
     else:
