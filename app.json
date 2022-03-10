@@ -30,7 +30,7 @@
     },
     "DURATION_LIMIT": {
       "description": "Duration Limit for Playout (In Mins).. Example: 60",
-      "value": "60",
+      "value": "90",
       "required": true
     },
     "ASSISTANT_PREFIX": {
