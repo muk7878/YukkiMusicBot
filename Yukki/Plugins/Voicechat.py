@@ -1,287 +1,463 @@
 import asyncio
+import math
 import os
+import dotenv
+import random
 import shutil
-import subprocess
-from sys import version as pyver
+from datetime import datetime
+from time import strftime, time
 
+import heroku3
+import requests
+import urllib3
+from git import Repo
+from git.exc import GitCommandError, InvalidGitRepositoryError
 from pyrogram import Client, filters
-from pyrogram.types import (InlineKeyboardMarkup, InputMediaPhoto, Message,
-                            Voice)
+from pyrogram.types import Message
 
-from config import get_queue
-from Yukki import SUDOERS, app, db_mem, random_assistant
-from Yukki.Database import (get_active_chats, get_active_video_chats,
-                            get_assistant, is_active_chat, save_assistant)
-from Yukki.Decorators.checker import checker, checkerCB
-from Yukki.Inline import primary_markup,choose_markup
-from Yukki.Utilities.assistant import get_assistant_details
+from config import (HEROKU_API_KEY, HEROKU_APP_NAME, UPSTREAM_BRANCH,
+                    UPSTREAM_REPO)
+from Yukki import LOG_GROUP_ID, MUSIC_BOT_NAME, SUDOERS, app
+from Yukki.Database import get_active_chats, remove_active_chat, remove_active_video_chat
+from Yukki.Utilities.heroku import is_heroku, user_input
+from Yukki.Utilities.paste import isPreviewUp, paste_queue
 
-loop = asyncio.get_event_loop()
-
-__MODULE__ = "Join/Leave"
-__HELP__ = """
-
-**Note:**
-Only for Sudo Users
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
-/joinassistant [Chat Username or Chat ID]
-- Join assistant to a group.
+__MODULE__ = "Server"
+__HELP__ = f"""
 
+**Catatan:**
+**Hanya untuk Pengguna Sudo**
 
-/leaveassistant [Chat Username or Chat ID]
-- Assistant will leave the particular group.
+/get_log
+- Dapatkan log 100 baris terakhir dari Heroku.
 
+/get_var
+- Dapatkan var konfigurasi dari Heroku atau .env.
 
-/leavebot [Chat Username or Chat ID]
-- Bot will leave the particular chat.
+/del_var
+- Hapus semua var di Heroku atau .env.
+
+/set_var [Var Name] [Value]
+- Setel Var atau Perbarui Var di heroku atau .env. Pisahkan Var dan Nilainya dengan spasi.
+
+/usage
+- Dapatkan Penggunaan Dyno.
+
+/update
+- Perbarui Bot Anda.
+
+/restart 
+- Mulai ulang Bot [Semua unduhan, cache, file mentah akan dihapus juga]. 
 """
 
-@app.on_callback_query(filters.regex("gback_list_chose_stream"))
-async def gback_list_chose_stream(_, CallbackQuery):
-    await CallbackQuery.answer()
-    callback_data = CallbackQuery.data.strip()
-    callback_request = callback_data.split(None, 1)[1]
-    videoid, duration, user_id = callback_request.split("|")
-    if CallbackQuery.from_user.id != int(user_id):
-        return await CallbackQuery.answer(
-            "This is not for you! Search You Own Song.", show_alert=True
-        )
-    buttons = choose_markup(videoid, duration, user_id)
-    await CallbackQuery.edit_message_reply_markup(
-        reply_markup=InlineKeyboardMarkup(buttons)
-    )
+
+XCB = [
+    "/",
+    "@",
+    ".",
+    "com",
+    ":",
+    "git",
+    "heroku",
+    "push",
+    str(HEROKU_API_KEY),
+    "https",
+    str(HEROKU_APP_NAME),
+    "HEAD",
+    "main",
+]
 
 
-@app.on_callback_query(filters.regex("pr_go_back_timer"))
-async def pr_go_back_timer(_, CallbackQuery):
-    await CallbackQuery.answer()
-    callback_data = CallbackQuery.data.strip()
-    callback_request = callback_data.split(None, 1)[1]
-    videoid, user_id = callback_request.split("|")
-    if await is_active_chat(CallbackQuery.message.chat.id):
-        if db_mem[CallbackQuery.message.chat.id]["videoid"] == videoid:
-            dur_left = db_mem[CallbackQuery.message.chat.id]["left"]
-            duration_min = db_mem[CallbackQuery.message.chat.id]["total"]
-            buttons = primary_markup(videoid, user_id, dur_left, duration_min)
-            await CallbackQuery.edit_message_reply_markup(
-                reply_markup=InlineKeyboardMarkup(buttons)
+@app.on_message(filters.command("get_log") & filters.user(SUDOERS))
+async def log_(client, message):
+    if await is_heroku():
+        if HEROKU_API_KEY == "" and HEROKU_APP_NAME == "":
+            return await message.reply_text(
+                "<b>HEROKU APP DETECTED!</b>\n\nIn order to update your app, you need to set up the `HEROKU_API_KEY` and `HEROKU_APP_NAME` vars respectively!"
             )
-
-
-@app.on_callback_query(filters.regex("timer_checkup_markup"))
-async def timer_checkup_markup(_, CallbackQuery):
-    callback_data = CallbackQuery.data.strip()
-    callback_request = callback_data.split(None, 1)[1]
-    videoid, user_id = callback_request.split("|")
-    if await is_active_chat(CallbackQuery.message.chat.id):
-        if db_mem[CallbackQuery.message.chat.id]["videoid"] == videoid:
-            dur_left = db_mem[CallbackQuery.message.chat.id]["left"]
-            duration_min = db_mem[CallbackQuery.message.chat.id]["total"]
-            return await CallbackQuery.answer(
-                f"Remaining {dur_left} out of {duration_min} Mins.",
-                show_alert=True,
+        elif HEROKU_API_KEY == "" or HEROKU_APP_NAME == "":
+            return await message.reply_text(
+                "<b>HEROKU APP DETECTED!</b>\n\n<b>Make sure to add both</b> `HEROKU_API_KEY` **and** `HEROKU_APP_NAME` <b>vars correctly in order to be able to update remotely!</b>"
             )
-        return await CallbackQuery.answer(f"Not Playing.", show_alert=True)
     else:
-        return await CallbackQuery.answer(
-            f"No Active Voice Chat", show_alert=True
-        )
-
-
-@app.on_message(filters.command("queue"))
-async def activevc(_, message: Message):
-    global get_queue
-    if await is_active_chat(message.chat.id):
-        mystic = await message.reply_text("Please Wait... Getting Queue..")
-        dur_left = db_mem[message.chat.id]["left"]
-        duration_min = db_mem[message.chat.id]["total"]
-        got_queue = get_queue.get(message.chat.id)
-        if not got_queue:
-            await mystic.edit(f"Nothing in Queue")
-        fetched = []
-        for get in got_queue:
-            fetched.append(get)
-
-        ### Results
-        current_playing = fetched[0][0]
-        user_name = fetched[0][1]
-
-        msg = "**Queued List**\n\n"
-        msg += "**Currently Playing:**"
-        msg += "\n▶️" + current_playing[:30]
-        msg += f"\n   ╚By:- {user_name}"
-        msg += f"\n   ╚Duration:- Remaining `{dur_left}` out of `{duration_min}` Mins."
-        fetched.pop(0)
-        if fetched:
-            msg += "\n\n"
-            msg += "**Up Next In Queue:**"
-            for song in fetched:
-                name = song[0][:30]
-                usr = song[1]
-                dur = song[2]
-                msg += f"\n⏸️{name}"
-                msg += f"\n   ╠Duration : {dur}"
-                msg += f"\n   ╚Requested by : {usr}\n"
-        if len(msg) > 4096:
-            await mystic.delete()
-            filename = "queue.txt"
-            with open(filename, "w+", encoding="utf8") as out_file:
-                out_file.write(str(msg.strip()))
-            await message.reply_document(
-                document=filename,
-                caption=f"**OUTPUT:**\n\n`Queued List`",
-                quote=False,
-            )
-            os.remove(filename)
-        else:
-            await mystic.edit(msg)
-    else:
-        await message.reply_text(f"Nothing in Queue")
-
-
-@app.on_message(filters.command("activevc") & filters.user(SUDOERS))
-async def activevc(_, message: Message):
-    served_chats = []
+        return await message.reply_text("Only for Heroku Apps")
     try:
-        chats = await get_active_chats()
-        for chat in chats:
-            served_chats.append(int(chat["chat_id"]))
-    except Exception as e:
-        await message.reply_text(f"**Error:-** {e}")
-    text = ""
-    j = 0
-    for x in served_chats:
+        Heroku = heroku3.from_key(HEROKU_API_KEY)
+        happ = Heroku.app(HEROKU_APP_NAME)
+    except BaseException:
+        return await message.reply_text(
+            " Please make sure your Heroku API Key, Your App name are configured correctly in the heroku"
+        )
+    data = happ.get_log()
+    if len(data) > 1024:
+        link = await paste_queue(data)
+        url = link + "/index.txt"
+        return await message.reply_text(
+            f"Here is the Log of Your App[{HEROKU_APP_NAME}]\n\n[Click Here to checkout Logs]({url})"
+        )
+    else:
+        return await message.reply_text(data)
+
+
+@app.on_message(filters.command("get_var") & filters.user(SUDOERS))
+async def varget_(client, message):
+    usage = "**Usage:**\n/get_var [Var Name]"
+    if len(message.command) != 2:
+        return await message.reply_text(usage)
+    check_var = message.text.split(None, 2)[1]
+    if await is_heroku():
+        if HEROKU_API_KEY == "" and HEROKU_APP_NAME == "":
+            return await message.reply_text(
+                "<b>HEROKU APP DETECTED!</b>\n\nIn order to update your app, you need to set up the `HEROKU_API_KEY` and `HEROKU_APP_NAME` vars respectively!"
+            )
+        elif HEROKU_API_KEY == "" or HEROKU_APP_NAME == "":
+            return await message.reply_text(
+                "<b>HEROKU APP DETECTED!</b>\n\n<b>Make sure to add both</b> `HEROKU_API_KEY` **and** `HEROKU_APP_NAME` <b>vars correctly in order to be able to update remotely!</b>"
+            )
         try:
-            title = (await app.get_chat(x)).title
-        except Exception:
-            title = "Private Group"
-        if (await app.get_chat(x)).username:
-            user = (await app.get_chat(x)).username
-            text += (
-                f"<b>{j + 1}.</b>  [{title}](https://t.me/{user})[`{x}`]\n"
+            Heroku = heroku3.from_key(HEROKU_API_KEY)
+            happ = Heroku.app(HEROKU_APP_NAME)
+        except BaseException:
+            return await message.reply_text(
+                " Please make sure your Heroku API Key, Your App name are configured correctly in the heroku"
+            )
+        heroku_config = happ.config()
+        if check_var in heroku_config:
+            return await message.reply_text(
+                f"**Heroku Config:**\n\n**{check_var}:** `{heroku_config[check_var]}`"
             )
         else:
-            text += f"<b>{j + 1}. {title}</b> [`{x}`]\n"
-        j += 1
-    if not text:
-        await message.reply_text("No Active Voice Chats")
+            return await message.reply_text("No such Var")
     else:
-        await message.reply_text(
-            f"**Active Voice Chats:-**\n\n{text}",
-            disable_web_page_preview=True,
-        )
+        path = dotenv.find_dotenv()
+        if not path:
+            return await message.reply_text(".env not found.")
+        output = dotenv.get_key(path, check_var)
+        if not output:
+            return await message.reply_text("No such Var")
+        else:
+            return await message.reply_text(f".env:\n\n**{check_var}:** `{str(output)}`")
 
 
-@app.on_message(filters.command("activevideo") & filters.user(SUDOERS))
-async def activevi_(_, message: Message):
-    served_chats = []
-    try:
-        chats = await get_active_video_chats()
-        for chat in chats:
-            served_chats.append(int(chat["chat_id"]))
-    except Exception as e:
-        await message.reply_text(f"**Error:-** {e}")
-    text = ""
-    j = 0
-    for x in served_chats:
+@app.on_message(filters.command("del_var") & filters.user(SUDOERS))
+async def vardel_(client, message):
+    usage = "**Usage:**\n/del_var [Var Name]"
+    if len(message.command) != 2:
+        return await message.reply_text(usage)
+    check_var = message.text.split(None, 2)[1]
+    if await is_heroku():
+        if HEROKU_API_KEY == "" and HEROKU_APP_NAME == "":
+            return await message.reply_text(
+                "<b>HEROKU APP DETECTED!</b>\n\nIn order to update your app, you need to set up the `HEROKU_API_KEY` and `HEROKU_APP_NAME` vars respectively!"
+            )
+        elif HEROKU_API_KEY == "" or HEROKU_APP_NAME == "":
+            return await message.reply_text(
+                "<b>HEROKU APP DETECTED!</b>\n\n<b>Make sure to add both</b> `HEROKU_API_KEY` **and** `HEROKU_APP_NAME` <b>vars correctly in order to be able to update remotely!</b>"
+            )
         try:
-            title = (await app.get_chat(x)).title
-        except Exception:
-            title = "Private Group"
-        if (await app.get_chat(x)).username:
-            user = (await app.get_chat(x)).username
-            text += (
-                f"<b>{j + 1}.</b>  [{title}](https://t.me/{user})[`{x}`]\n"
+            Heroku = heroku3.from_key(HEROKU_API_KEY)
+            happ = Heroku.app(HEROKU_APP_NAME)
+        except BaseException:
+            return await message.reply_text(
+                " Please make sure your Heroku API Key, Your App name are configured correctly in the heroku"
+            )
+        heroku_config = happ.config()
+        if check_var in heroku_config:
+            await message.reply_text(
+                f"**Heroku Var Deletion:**\n\n`{check_var}` has been deleted successfully."
+            )
+            del heroku_config[check_var]
+        else:
+            return await message.reply_text(f"No such Var")
+    else:
+        path = dotenv.find_dotenv()
+        if not path:
+            return await message.reply_text(".env not found.")
+        output = dotenv.unset_key(path, check_var)
+        if not output[0]:
+            return await message.reply_text("No such Var")
+        else:
+            return await message.reply_text(f".env Var Deletion:\n\n`{check_var}` has been deleted successfully. To restart the bot touch /restart command.")
+
+
+@app.on_message(filters.command("set_var") & filters.user(SUDOERS))
+async def set_var(client, message):
+    usage = "**Usage:**\n/set_var [Var Name] [Var Value]"
+    if len(message.command) < 3:
+        return await message.reply_text(usage)
+    to_set = message.text.split(None, 2)[1].strip()
+    value = message.text.split(None, 2)[2].strip()
+    if await is_heroku():
+        if HEROKU_API_KEY == "" and HEROKU_APP_NAME == "":
+            return await message.reply_text(
+                "<b>HEROKU APP DETECTED!</b>\n\nIn order to update your app, you need to set up the `HEROKU_API_KEY` and `HEROKU_APP_NAME` vars respectively!"
+            )
+        elif HEROKU_API_KEY == "" or HEROKU_APP_NAME == "":
+            return await message.reply_text(
+                "<b>HEROKU APP DETECTED!</b>\n\n<b>Make sure to add both</b> `HEROKU_API_KEY` **and** `HEROKU_APP_NAME` <b>vars correctly in order to be able to update remotely!</b>"
+            )
+        try:
+            Heroku = heroku3.from_key(HEROKU_API_KEY)
+            happ = Heroku.app(HEROKU_APP_NAME)
+        except BaseException:
+            return await message.reply_text(
+                " Please make sure your Heroku API Key, Your App name are configured correctly in the heroku"
+            )
+        heroku_config = happ.config()
+        if to_set in heroku_config:
+            await message.reply_text(
+                f"**Heroku Var Updation:**\n\n`{to_set}` has been updated successfully. Bot will Restart Now."
             )
         else:
-            text += f"<b>{j + 1}. {title}</b> [`{x}`]\n"
-        j += 1
-    if not text:
-        await message.reply_text("No Active Voice Chats")
+            await message.reply_text(
+                f"Added New Var with name `{to_set}`. Bot will Restart Now."
+            )
+        heroku_config[to_set] = value
     else:
-        await message.reply_text(
-            f"**Active Video Calls:-**\n\n{text}",
-            disable_web_page_preview=True,
-        )
+        path = dotenv.find_dotenv()
+        if not path:
+            return await message.reply_text(".env not found.")
+        output = dotenv.set_key(path, to_set, value)
+        if dotenv.get_key(path, to_set):
+            return await message.reply_text(f"**.env Var Updation:**\n\n`{to_set}`has been updated successfully. To restart the bot touch /restart command.")
+        else:
+            return await message.reply_text(f"**.env dəyişən əlavə edilməsi:**\n\n`{to_set}` has been added sucsessfully. To restart the bot touch /restart command.")
 
 
-@app.on_message(filters.command("joinassistant") & filters.user(SUDOERS))
-async def basffy(_, message):
-    if len(message.command) != 2:
-        await message.reply_text(
-            "**Usage:**\n/joinassistant [Chat Username or Chat ID]"
-        )
-        return
-    chat = message.text.split(None, 2)[1]
+@app.on_message(filters.command("usage") & filters.user(SUDOERS))
+async def usage_dynos(client, message):
+    ### Credits CatUserbot
+    if await is_heroku():
+        if HEROKU_API_KEY == "" and HEROKU_APP_NAME == "":
+            return await message.reply_text(
+                "<b>HEROKU APP DETECTED!</b>\n\nIn order to update your app, you need to set up the `HEROKU_API_KEY` and `HEROKU_APP_NAME` vars respectively!"
+            )
+        elif HEROKU_API_KEY == "" or HEROKU_APP_NAME == "":
+            return await message.reply_text(
+                "<b>HEROKU APP DETECTED!</b>\n\n<b>Make sure to add both</b> `HEROKU_API_KEY` **and** `HEROKU_APP_NAME` <b>vars correctly in order to be able to update remotely!</b>"
+            )
+    else:
+        return await message.reply_text("Only for Heroku Apps")
     try:
-        chat_id = (await app.get_chat(chat)).id
-    except:
+        Heroku = heroku3.from_key(HEROKU_API_KEY)
+        happ = Heroku.app(HEROKU_APP_NAME)
+    except BaseException:
         return await message.reply_text(
-            "Add Bot to this Chat First.. Unknown Chat for the bot"
+            " Please make sure your Heroku API Key, Your App name are configured correctly in the heroku"
         )
-    _assistant = await get_assistant(chat_id, "assistant")
-    if not _assistant:
-        return await message.reply_text(
-            "No Pre-Saved Assistant Found.\n\nYou can set Assistant Via /play inside {Chat}'s Group"
-        )
-    else:
-        ran_ass = _assistant["saveassistant"]
-    ASS_ID, ASS_NAME, ASS_USERNAME, ASS_ACC = await get_assistant_details(
-        ran_ass
+    dyno = await message.reply_text("Checking Heroku Usage. Please Wait")
+    account_id = Heroku.account().id
+    useragent = (
+        "Mozilla/5.0 (Linux; Android 10; SM-G975F) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/80.0.3987.149 Mobile Safari/537.36"
     )
+    headers = {
+        "User-Agent": useragent,
+        "Authorization": f"Bearer {HEROKU_API_KEY}",
+        "Accept": "application/vnd.heroku+json; version=3.account-quotas",
+    }
+    path = "/accounts/" + account_id + "/actions/get-quota"
+    r = requests.get("https://api.heroku.com" + path, headers=headers)
+    if r.status_code != 200:
+        return await dyno.edit("Unable to fetch.")
+    result = r.json()
+    quota = result["account_quota"]
+    quota_used = result["quota_used"]
+    remaining_quota = quota - quota_used
+    percentage = math.floor(remaining_quota / quota * 100)
+    minutes_remaining = remaining_quota / 60
+    hours = math.floor(minutes_remaining / 60)
+    minutes = math.floor(minutes_remaining % 60)
+    App = result["apps"]
     try:
-        await ASS_ACC.join_chat(chat_id)
-    except Exception as e:
-        await message.reply_text(f"Failed\n**Possible reason could be**:{e}")
-        return
-    await message.reply_text("Joined.")
+        App[0]["quota_used"]
+    except IndexError:
+        AppQuotaUsed = 0
+        AppPercentage = 0
+    else:
+        AppQuotaUsed = App[0]["quota_used"] / 60
+        AppPercentage = math.floor(App[0]["quota_used"] * 100 / quota)
+    AppHours = math.floor(AppQuotaUsed / 60)
+    AppMinutes = math.floor(AppQuotaUsed % 60)
+    await asyncio.sleep(1.5)
+    text = f"""
+**DYNO USAGE**
+
+<u>Usage:</u>
+Total Used: `{AppHours}`**h**  `{AppMinutes}`**m**  [`{AppPercentage}`**%**]
+
+<u>Remaining Quota:</u>
+Total Left: `{hours}`**h**  `{minutes}`**m**  [`{percentage}`**%**]"""
+    return await dyno.edit(text)
 
 
-@app.on_message(filters.command("leavebot") & filters.user(SUDOERS))
-async def baaaf(_, message):
-    if len(message.command) != 2:
-        await message.reply_text(
-            "**Usage:**\n/leavebot [Chat Username or Chat ID]"
-        )
-        return
-    chat = message.text.split(None, 2)[1]
+@app.on_message(filters.command("update") & filters.user(SUDOERS))
+async def update_(client, message):
+    if await is_heroku():
+        if HEROKU_API_KEY == "" and HEROKU_APP_NAME == "":
+            return await message.reply_text(
+                "<b>HEROKU APP DETECTED!</b>\n\nIn order to update your app, you need to set up the `HEROKU_API_KEY` and `HEROKU_APP_NAME` vars respectively!"
+            )
+        elif HEROKU_API_KEY == "" or HEROKU_APP_NAME == "":
+            return await message.reply_text(
+                "<b>HEROKU APP DETECTED!</b>\n\n<b>Make sure to add both</b> `HEROKU_API_KEY` **and** `HEROKU_APP_NAME` <b>vars correctly in order to be able to update remotely!</b>"
+            )
+    response = await message.reply_text("Checking for available updates...")
     try:
-        await app.leave_chat(chat)
-    except Exception as e:
-        await message.reply_text(f"Failed\n**Possible reason could be**:{e}")
-        print(e)
-        return
-    await message.reply_text("Bot has left the chat successfully")
-
-
-@app.on_message(filters.command("leaveassistant") & filters.user(SUDOERS))
-async def baujaf(_, message):
-    if len(message.command) != 2:
-        await message.reply_text(
-            "**Usage:**\n/leave [Chat Username or Chat ID]"
-        )
-        return
-    chat = message.text.split(None, 2)[1]
-    try:
-        chat_id = (await app.get_chat(chat)).id
-    except:
-        return await message.reply_text(
-            "Add Bot to this Chat First.. Unknown Chat for the bot"
-        )
-    _assistant = await get_assistant(chat, "assistant")
-    if not _assistant:
-        return await message.reply_text(
-            "No Pre-Saved Assistant Found.\n\nYou can set Assistant Via /play inside {Chat}'s Group"
+        repo = Repo()
+    except GitCommandError:
+        return await response.edit("Git Command Error")
+    except InvalidGitRepositoryError:
+        return await response.edit("Invalid Git Repsitory")
+    to_exc = f"git fetch origin {UPSTREAM_BRANCH} &> /dev/null"
+    os.system(to_exc)
+    await asyncio.sleep(7)
+    verification = ""
+    REPO_ = repo.remotes.origin.url.split(".git")[0]  # main git repository
+    for checks in repo.iter_commits(f"HEAD..origin/{UPSTREAM_BRANCH}"):
+        verification = str(checks.count())
+    if verification == "":
+        return await response.edit("Bot is up-to-date!")
+    updates = ""
+    ordinal = lambda format: "%d%s" % (
+        format,
+        "tsnrhtdd"[
+            (format // 10 % 10 != 1) * (format % 10 < 4) * format % 10 :: 4
+        ],
+    )
+    for info in repo.iter_commits(f"HEAD..origin/{UPSTREAM_BRANCH}"):
+        updates += f"<b>➣ #{info.count()}: [{info.summary}]({REPO_}/commit/{info}) by -> {info.author}</b>\n\t\t\t\t<b>➥ Commited on:</b> {ordinal(int(datetime.fromtimestamp(info.committed_date).strftime('%d')))} {datetime.fromtimestamp(info.committed_date).strftime('%b')}, {datetime.fromtimestamp(info.committed_date).strftime('%Y')}\n\n"
+    _update_response_ = "<b>A new update is available for the Bot!</b>\n\n➣ Pushing Updates Now</code>\n\n**<u>Updates:</u>**\n\n"
+    _final_updates_ = _update_response_ + updates
+    if len(_final_updates_) > 4096:
+        link = await paste_queue(updates)
+        url = link + "/index.txt"
+        nrs = await response.edit(
+            f"<b>A new update is available for the Bot!</b>\n\n➣ Pushing Updates Now</code>\n\n**<u>Updates:</u>**\n\n[Click Here to checkout Updates]({url})"
         )
     else:
-        ran_ass = _assistant["saveassistant"]
-    ASS_ID, ASS_NAME, ASS_USERNAME, ASS_ACC = await get_assistant_details(
-        ran_ass
-    )
-    try:
-        await ASS_ACC.leave_chat(chat_id)
-    except Exception as e:
-        await message.reply_text(f"Failed\n**Possible reason could be**:{e}")
-        return
-    await message.reply_text("Left.")
+        nrs = await response.edit(
+            _final_updates_, disable_web_page_preview=True
+        )
+    os.system("git stash &> /dev/null && git pull")
+    if await is_heroku():
+        try:
+            await response.edit(
+                f"{nrs.text}\n\nBot was updated successfully on Heroku! Now, wait for 2 - 3 mins until the bot restarts!"
+            )
+            os.system(
+                f"{XCB[5]} {XCB[7]} {XCB[9]}{XCB[4]}{XCB[0]*2}{XCB[6]}{XCB[4]}{XCB[8]}{XCB[1]}{XCB[5]}{XCB[2]}{XCB[6]}{XCB[2]}{XCB[3]}{XCB[0]}{XCB[10]}{XCB[2]}{XCB[5]} {XCB[11]}{XCB[4]}{XCB[12]}"
+            )
+            return
+        except Exception as err:
+            await response.edit(
+                f"{nrs.text}\n\nSomething went wrong while initiating reboot! Please try again later or check logs for more info."
+            )
+            return await app.send_message(
+                LOG_GROUP_ID,
+                f"AN EXCEPTION OCCURRED AT #UPDATER DUE TO: <code>{err}</code>",
+            )
+    else:
+        await response.edit(
+            f"{nrs.text}\n\nBot was updated successfully! Now, wait for 1 - 2 mins until the bot reboots!"
+        )
+        os.system("pip3 install -r requirements.txt")
+        os.system(f"kill -9 {os.getpid()} && bash start")
+        exit()
+    return
+
+
+@app.on_message(filters.command("restart") & filters.user(SUDOERS))
+async def restart_(_, message):
+    response = await message.reply_text("Restarting....")
+    if await is_heroku():
+        if HEROKU_API_KEY == "" and HEROKU_APP_NAME == "":
+            return await message.reply_text(
+                "<b>HEROKU APP DETECTED!</b>\n\nIn order to restart your app, you need to set up the `HEROKU_API_KEY` and `HEROKU_APP_NAME` vars respectively!"
+            )
+        elif HEROKU_API_KEY == "" or HEROKU_APP_NAME == "":
+            return await message.reply_text(
+                "<b>HEROKU APP DETECTED!</b>\n\n<b>Make sure to add both</b> `HEROKU_API_KEY` **and** `HEROKU_APP_NAME` <b>vars correctly in order to be able to restart remotely!</b>"
+            )
+        try:
+            served_chats = []
+            try:
+                chats = await get_active_chats()
+                for chat in chats:
+                    served_chats.append(int(chat["chat_id"]))
+            except Exception as e:
+                pass
+            for x in served_chats:
+                try:
+                    await app.send_message(
+                        x,
+                        f"{MUSIC_BOT_NAME} has just restarted herself. Sorry for the issues.\n\nStart playing after 10-15 seconds again.",
+                    )
+                    await remove_active_chat(x)
+                    await remove_active_video_chat(x)
+                except Exception:
+                    pass
+            heroku3.from_key(HEROKU_API_KEY).apps()[HEROKU_APP_NAME].restart()
+            await response.edit(
+                "**Heroku Restart**\n\nReboot has been initiated successfully! Wait for 1 - 2 minutes until the bot restarts."
+            )
+            return
+        except Exception as err:
+            await response.edit(
+                "Something went wrong while initiating reboot! Please try again later or check logs for more info."
+            )
+            return
+    else:
+        served_chats = []
+        try:
+            chats = await get_active_chats()
+            for chat in chats:
+                served_chats.append(int(chat["chat_id"]))
+        except Exception as e:
+            pass
+        for x in served_chats:
+            try:
+                await app.send_message(
+                    x,
+                    f"{MUSIC_BOT_NAME} has just restarted herself. Sorry for the issues.\n\nStart playing after 10-15 seconds again.",
+                )
+                await remove_active_chat(x)
+                await remove_active_video_chat(x)
+            except Exception:
+                pass
+        A = "downloads"
+        B = "raw_files"
+        C = "cache"
+        D = "search"
+        try:
+            shutil.rmtree(A)
+            shutil.rmtree(B)
+            shutil.rmtree(C)
+            shutil.rmtree(D)
+        except:
+            pass
+        await asyncio.sleep(2)
+        try:
+            os.mkdir(A)
+        except:
+            pass
+        try:
+            os.mkdir(B)
+        except:
+            pass
+        try:
+            os.mkdir(C)
+        except:
+            pass
+        try:
+            os.mkdir(D)
+        except:
+            pass
+        await response.edit(
+            "Reboot has been initiated successfully! Wait for 1 - 2 minutes until the bot restarts."
+        )
+        os.system(f"kill -9 {os.getpid()} && bash start")
