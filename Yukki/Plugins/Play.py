@@ -175,16 +175,14 @@ async def play(_, message: Message):
             )
             return
         mystic = await message.reply_text("🔍 **Mencari**...")
-        query = message.text.split(None, 1)[1]
-        (
-            title,
-            duration_min,
-            duration_sec,
-            thumb,
-            videoid,
-        ) = get_yt_info_query(query)
-        await mystic.delete()
-        buttons = search_markup(
+        results = YoutubeSearch(query, max_results=5).to_dict()
+        med = InputMediaPhoto(
+        media="Utils/Result.JPEG",
+        caption=(
+            f"1️⃣<b>{results[0]['title']}</b>\n  ┗  🔗 <u>__[Dapatkan Informasi Tambahan](https://t.me/{BOT_USERNAME}?start=info_{results[0]['id']})__</u>\n\n2️⃣<b>{results[1]['title']}</b>\n  ┗  🔗 <u>__[Dapatkan Informasi Tambahan](https://t.me/{BOT_USERNAME}?start=info_{results[1]['id']})__</u>\n\n3️⃣<b>{results[2]['title']}</b>\n  ┗  🔗 <u>__[Dapatkan Informasi Tambahan](https://t.me/{BOT_USERNAME}?start=info_{results[2]['id']})__</u>\n\n4️⃣<b>{results[3]['title']}</b>\n  ┗  🔗 <u>__[Dapatkan Informasi Tambahan](https://t.me/{BOT_USERNAME}?start=info_{results[3]['id']})__</u>\n\n5️⃣<b>{results[4]['title']}</b>\n  ┗  🔗 <u>__[Dapatkan Informasi Tambahan](https://t.me/{BOT_USERNAME}?start=info_{results[4]['id']})__</u>"
+        ),
+    )
+    buttons = search_markup(
         results[0]["id"],
         results[1]["id"],
         results[2]["id"],
