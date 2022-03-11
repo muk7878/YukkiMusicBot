@@ -185,24 +185,22 @@ async def play(_, message: Message):
         ) = get_yt_info_query(query)
         await mystic.delete()
         buttons = search_markup(
-    ID1,
-    ID2,
-    ID3,
-    ID4,
-    ID5,
-    duration1,
-    duration2,
-    duration3,
-    duration4,
-    duration5,
-    user_id,
-    query,
-        )
-        return await message.reply_photo(
-            photo=thumb,
-            caption=f"📎Judul: **{title}\n\n⏳Durasi:** {duration_min} Mins\n\n__[Dapatkan Informasi Tambahan Tentang Video](https://t.me/{BOT_USERNAME}?start=info_{videoid})__",
-            reply_markup=InlineKeyboardMarkup(buttons),
-        )
+        results[0]["id"],
+        results[1]["id"],
+        results[2]["id"],
+        results[3]["id"],
+        results[4]["id"],
+        results[0]["duration"],
+        results[1]["duration"],
+        results[2]["duration"],
+        results[3]["duration"],
+        results[4]["duration"],
+        user_id,
+        query,
+    )
+    return await CallbackQuery.edit_message_media(
+        media=med, reply_markup=InlineKeyboardMarkup(buttons)
+    )
 
 
 @app.on_callback_query(filters.regex(pattern=r"MusicStream"))
