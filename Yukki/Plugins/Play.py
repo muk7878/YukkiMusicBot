@@ -176,29 +176,22 @@ async def play(_, message: Message):
             return
         mystic = await message.reply_text("🔍 **Mencari**...")
         query = message.text.split(None, 1)[1]
+        (
+            title,
+            duration_min,
+            duration_sec,
+            thumb,
+            videoid,
+        ) = get_yt_info_query(query)
         await mystic.delete()
-        results = YoutubeSearch(query, max_results=5).to_dict()
-        buttons = search_markup(
-        results[0]["id"],
-        results[1]["id"],
-        results[2]["id"],
-        results[3]["id"],
-        results[4]["id"],
-        results[0]["duration"],
-        results[1]["duration"],
-        results[2]["duration"],
-        results[3]["duration"],
-        results[4]["duration"],
-        user_id,
-        query,
-    )
-     await message.edit_text(
-     caption=(
-            f"1️⃣<b>{results[0]['title']}</b>\n  ┗  🔗 <u>__[Dapatkan Informasi Tambahan](https://t.me/{BOT_USERNAME}?start=info_{results[0]['id']})__</u>\n\n2️⃣<b>{results[1]['title']}</b>\n  ┗  🔗 <u>__[Dapatkan Informasi Tambahan](https://t.me/{BOT_USERNAME}?start=info_{results[1]['id']})__</u>\n\n3️⃣<b>{results[2]['title']}</b>\n  ┗  🔗 <u>__[Dapatkan Informasi Tambahan](https://t.me/{BOT_USERNAME}?start=info_{results[2]['id']})__</u>\n\n4️⃣<b>{results[3]['title']}</b>\n  ┗  🔗 <u>__[Dapatkan Informasi Tambahan](https://t.me/{BOT_USERNAME}?start=info_{results[3]['id']})__</u>\n\n5️⃣<b>{results[4]['title']}</b>\n  ┗  🔗 <u>__[Dapatkan Informasi Tambahan](https://t.me/{BOT_USERNAME}?start=info_{results[4]['id']})__</u>",
+        buttons = url_markup(
+            videoid, duration_min, message.from_user.id, query, 0
+        )
+        return await message.reply_photo(
+            photo=thumb,
+            caption=f"📎Judul: **{title}\n\n⏳Durasi:** {duration_min} Mins\n\n__[Dapatkan Informasi Tambahan Tentang Video](https://t.me/{BOT_USERNAME}?start=info_{videoid})__",
             reply_markup=InlineKeyboardMarkup(buttons),
         )
-        disable_web_page_preview = True
-        return
 
 
 @app.on_callback_query(filters.regex(pattern=r"MusicStream"))
