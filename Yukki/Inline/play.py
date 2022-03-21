@@ -18,15 +18,11 @@ def url_markup(videoid, duration, user_id, query, query_type):
         ],
         [
             InlineKeyboardButton(
-                text="🎧perintah musik🎧",
-                url=f"https://t.me/music_cat_ygy/4",
-            ),
-        ],
-        [
-            InlineKeyboardButton(
                 text="🔎 Pencarian lainnya",
                 callback_data=f"Search {query}|{user_id}",
             ),
+        ],
+        [
             InlineKeyboardButton(
                 text="🗑️ Tutup ",
                 callback_data=f"forceclose {query}|{user_id}",
